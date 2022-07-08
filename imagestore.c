@@ -3,7 +3,7 @@
 #include <sys/pathsearch.h>
 #include <str/str2num.h>
 #include <str/sizes.h>
-#include <io/slog.h>
+#include <syslog.h>
 #include <string.h>
 #include <stdio.h>
 #include <unistd.h>
@@ -76,10 +76,10 @@ bool imagestore_library_init(const char *_options[]) {
     if (g_imagestore.url[0]=='\0'/*err*/)  goto e_missing_option_url;
     /* Success. */
     return true;
- e_errno:               error("%s", strerror(errno));                goto e_cleanup;
- e_missing_path_env:    error("Missing environment variable: PATH"); goto e_cleanup;
- e_missing_option_path: error("Missing option: imagestore_path");    goto e_cleanup;
- e_missing_option_url:  error("Missing option: imagestore_url");     goto e_cleanup;
+ e_errno:               syslog(LOG_ERR, "%s", strerror(errno));                goto e_cleanup;
+ e_missing_path_env:    syslog(LOG_ERR, "Missing environment variable: PATH"); goto e_cleanup;
+ e_missing_option_path: syslog(LOG_ERR, "Missing option: imagestore_path");    goto e_cleanup;
+ e_missing_option_url:  syslog(LOG_ERR, "Missing option: imagestore_url");     goto e_cleanup;
  e_cleanup:             imagestore_library_deinit();                 return false;
 }
 
@@ -93,7 +93,7 @@ bool imagestore_get_path(char _b[], size_t _bsz, const char _id[]) {
                      g_imagestore.path,
                      _id,
                      g_imagestore.format);
-    if (e>=_bsz/*err*/) { error("Identifier too long"); return false; }
+    if (e>=_bsz/*err*/) { syslog(LOG_ERR, "Identifier too long"); return false; }
     return true;
 }
 
@@ -106,7 +106,7 @@ bool imagestore_fork(pid_t *_pid, const char _id[], const char _ifmt[], int _fd0
     e = imagestore_get_path(path_o, sizeof(path_o)-1, _id);
     if (!e/*err*/) { return false; } 
     pid = fork();
-    if (pid==-1/*err*/) { error("%s", strerror(errno)); return false; }
+    if (pid==-1/*err*/) { syslog(LOG_ERR, "%s", strerror(errno)); return false; }
     if (pid==0) {
         if (_fd0!=0) {
             dup2(_fd0, 0);
@@ -119,7 +119,7 @@ bool imagestore_fork(pid_t *_pid, const char _id[], const char _ifmt[], int _fd0
               "-strip" ,
               path_o,
               NULL);
-        error("Can't execute %s: %s", g_imagestore.convert_m, strerror(errno));
+        syslog(LOG_ERR, "Can't execute %s: %s", g_imagestore.convert_m, strerror(errno));
         exit(1);
     }
     *_pid = pid;
@@ -136,9 +136,9 @@ bool imagestore_wait(pid_t _pid) {
         if (WEXITSTATUS(status)/*err*/) goto e_convert_failed;
     }
     return true;
- e_errno:          error("imagestore: wait %i: %s", _pid, strerror(errno)); return false;
- e_interrupted:    error("imagestore: Interrupted.");        return false;
- e_convert_failed: error("imagestore: Convert failed.");     return false;
+ e_errno:          syslog(LOG_ERR, "imagestore: wait %i: %s", _pid, strerror(errno)); return false;
+ e_interrupted:    syslog(LOG_ERR, "imagestore: Interrupted.");        return false;
+ e_convert_failed: syslog(LOG_ERR, "imagestore: Convert failed.");     return false;
 }
 
 bool imagestore_save(const char _id[], const char *_ifmt, const void *_b, size_t _bsz) {
@@ -163,7 +163,7 @@ bool imagestore_save(const char _id[], const char *_ifmt, const void *_b, size_t
     if (p[1]!=-1) close(p[1]);
     return r;
  e_errno:
-    error("%s", strerror(errno)); 
+    syslog(LOG_ERR, "%s", strerror(errno)); 
     goto cleanup;
 }
 
@@ -188,7 +188,7 @@ bool imagestore_get_url(char _b[], size_t _bsz, const char _id[], bool *_found) 
             *_found = false;
             return true;
         } else {
-            error("%s: %s", path_i, strerror(errno));
+            syslog(LOG_ERR, "%s: %s", path_i, strerror(errno));
             return false;
         }
     }
@@ -211,7 +211,7 @@ bool filename_get_format(char _b[], size_t _bsz, const char _filename[]) {
         if (*c=='.') last_dot = c;
     }
     if (!last_dot) {
-        error("%s: Can't get the file format.", _filename);
+        syslog(LOG_ERR, "%s: Can't get the file format.", _filename);
         return false;
     }
     for (i=0,c=last_dot+1; i<_bsz && *c; i++, c++) {
@@ -222,7 +222,7 @@ bool filename_get_format(char _b[], size_t _bsz, const char _filename[]) {
         }
     }
     if (i>32 || i>=_bsz) {
-        error("%s: Format too long: %li", _filename, i);
+        syslog(LOG_ERR, "%s: Format too long: %li", _filename, i);
         return false;
     }
     _b[i] = '\0';
