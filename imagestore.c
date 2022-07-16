@@ -1,3 +1,4 @@
+#define _GNU_SOURCE
 #include "imagestore.h"
 #include <sys/wait.h>
 #include <sys/pathsearch.h>
